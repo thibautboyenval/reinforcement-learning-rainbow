@@ -18,17 +18,15 @@ class NoopResetEnv(gym.Wrapper):
 
     def reset(self, **kwargs):
         """ Do no-op action for a number of steps in [1, noop_max]."""
-        self.env.reset(**kwargs)
+        obs, info = self.env.reset(**kwargs)
         if self.override_num_noops is not None:
             noops = self.override_num_noops
         else:
-            noops = self.unwrapped.np_random.integers(1, self.noop_max + 1)
+            noops = self.unwrapped.np_random.integers(1, self.noop_max + 1)  # Updated for numpy compatibility
         assert noops > 0
-        obs = None
         for _ in range(noops):
             obs, _, done, truncated, _ = self.env.step(self.noop_action)
-            done = done or truncated
-            if done:
+            if done or truncated:
                 obs, info = self.env.reset(**kwargs)
         return obs, info
 
@@ -43,15 +41,13 @@ class FireResetEnv(gym.Wrapper):
         assert len(env.unwrapped.get_action_meanings()) >= 3
 
     def reset(self, **kwargs):
-        self.env.reset(**kwargs)
-        obs, _, done, truncated, info = self.env.step(1)
-        done = done or truncated
-        if done:
-            self.env.reset(**kwargs)
-        obs, _, done, truncated, info = self.env.step(2)
-        done = done or truncated
-        if done:
-            self.env.reset(**kwargs)
+        obs, info = self.env.reset(**kwargs)
+        obs, _, done, truncated, _ = self.env.step(1)
+        if done or truncated:
+            obs, info = self.env.reset(**kwargs)
+        obs, _, done, truncated, _ = self.env.step(2)
+        if done or truncated:
+            obs, info = self.env.reset(**kwargs)
         return obs, info
 
     def step(self, ac):
@@ -64,12 +60,11 @@ class EpisodicLifeEnv(gym.Wrapper):
         """
         gym.Wrapper.__init__(self, env)
         self.lives = 0
-        self.was_real_done  = True
+        self.was_real_done = True
 
     def step(self, action):
         obs, reward, done, truncated, info = self.env.step(action)
-        done = done or truncated
-        self.was_real_done = done
+        self.was_real_done = done or truncated
         # check current lives, make loss of life terminal,
         # then update lives to handle bonus lives
         lives = self.env.unwrapped.ale.lives()
@@ -79,7 +74,7 @@ class EpisodicLifeEnv(gym.Wrapper):
             # the environment advertises done.
             done = True
         self.lives = lives
-        return obs, reward, done, truncated, info
+        return obs, reward, done, info
 
     def reset(self, **kwargs):
         """Reset only when lives are exhausted.
@@ -90,7 +85,7 @@ class EpisodicLifeEnv(gym.Wrapper):
             obs, info = self.env.reset(**kwargs)
         else:
             # no-op step to advance from terminal/lost life state
-            obs, _, _, _, info = self.env.step(0)
+            obs, _, _, _, _ = self.env.step(0)
         self.lives = self.env.unwrapped.ale.lives()
         return obs, info
 
@@ -99,11 +94,11 @@ class MaxAndSkipEnv(gym.Wrapper):
         """Return only every `skip`-th frame"""
         gym.Wrapper.__init__(self, env)
         # most recent raw observations (for max pooling across time steps)
-        self._obs_buffer = np.zeros((2,)+env.observation_space.shape, dtype=np.uint8)
-        self._skip       = skip
+        self._obs_buffer = np.zeros((2,) + env.observation_space.shape, dtype=np.uint8)
+        self._skip = skip
 
-    def reset(self):
-        return self.env.reset()
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
 
     def step(self, action):
         """Repeat action, sum reward, and max over last observations."""
@@ -111,20 +106,18 @@ class MaxAndSkipEnv(gym.Wrapper):
         done = None
         for i in range(self._skip):
             obs, reward, done, truncated, info = self.env.step(action)
-            done = done or truncated
-            if i == self._skip - 2: self._obs_buffer[0] = obs
-            if i == self._skip - 1: self._obs_buffer[1] = obs
+            if i == self._skip - 2:
+                self._obs_buffer[0] = obs
+            if i == self._skip - 1:
+                self._obs_buffer[1] = obs
             total_reward += reward
-            if done:
+            if done or truncated:
                 break
         # Note that the observation on the done=True frame
         # doesn't matter
         max_frame = self._obs_buffer.max(axis=0)
 
-        return max_frame, total_reward, done, truncated, info
-
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
+        return max_frame, total_reward, done, info
 
 class ClipRewardEnv(gym.RewardWrapper):
     def __init__(self, env):
@@ -141,7 +134,7 @@ class WarpFrame(gym.ObservationWrapper):
         self.width = 84
         self.height = 84
         self.observation_space = spaces.Box(low=0, high=255,
-            shape=(self.height, self.width, 1), dtype=np.uint8)
+                                            shape=(self.height, self.width, 1), dtype=np.uint8)
 
     def observation(self, frame):
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
@@ -162,8 +155,8 @@ class FrameStack(gym.Wrapper):
         shp = env.observation_space.shape
         self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0], shp[1], shp[2] * k), dtype=np.uint8)
 
-    def reset(self):
-        ob, info = self.env.reset()
+    def reset(self, **kwargs):
+        ob, info = self.env.reset(**kwargs)
         for _ in range(self.k):
             self.frames.append(ob)
         return self._get_ob(), info
@@ -171,7 +164,7 @@ class FrameStack(gym.Wrapper):
     def step(self, action):
         ob, reward, done, truncated, info = self.env.step(action)
         self.frames.append(ob)
-        return self._get_ob(), reward, done, truncated, info
+        return self._get_ob(), reward, done, info
 
     def _get_ob(self):
         assert len(self.frames) == self.k
@@ -216,6 +209,7 @@ class LazyFrames(object):
 
 def make_atari(env_id):
     env = gym.make(env_id)
+    assert 'NoFrameskip' in env.spec.id
     env = NoopResetEnv(env, noop_max=30)
     env = MaxAndSkipEnv(env, skip=4)
     return env
@@ -236,8 +230,6 @@ def wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=False, 
         env = FrameStack(env, 4)
     return env
 
-
-
 class ImageToPyTorch(gym.ObservationWrapper):
     """
     Image shape to num_channels x weight x height
@@ -249,7 +241,6 @@ class ImageToPyTorch(gym.ObservationWrapper):
 
     def observation(self, observation):
         return np.swapaxes(observation, 2, 0)
-    
 
 def wrap_pytorch(env):
     return ImageToPyTorch(env)
