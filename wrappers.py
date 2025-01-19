@@ -26,7 +26,8 @@ class NoopResetEnv(gym.Wrapper):
         assert noops > 0
         obs = None
         for _ in range(noops):
-            obs, _, done, _ = self.env.step(self.noop_action)
+            obs, _, done, truncated, _ = self.env.step(self.noop_action)
+            done = done or truncated
             if done:
                 obs = self.env.reset(**kwargs)
         return obs
