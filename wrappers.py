@@ -29,8 +29,8 @@ class NoopResetEnv(gym.Wrapper):
             obs, _, done, truncated, _ = self.env.step(self.noop_action)
             done = done or truncated
             if done:
-                obs = self.env.reset(**kwargs)
-        return obs
+                obs, info = self.env.reset(**kwargs)
+        return obs, info
 
     def step(self, ac):
         return self.env.step(ac)
@@ -44,15 +44,15 @@ class FireResetEnv(gym.Wrapper):
 
     def reset(self, **kwargs):
         self.env.reset(**kwargs)
-        obs, _, done, truncated, _ = self.env.step(1)
+        obs, _, done, truncated, info = self.env.step(1)
         done = done or truncated
         if done:
             self.env.reset(**kwargs)
-        obs, _, done, truncated, _ = self.env.step(2)
+        obs, _, done, truncated, info = self.env.step(2)
         done = done or truncated
         if done:
             self.env.reset(**kwargs)
-        return obs
+        return obs, info
 
     def step(self, ac):
         return self.env.step(ac)
@@ -87,12 +87,12 @@ class EpisodicLifeEnv(gym.Wrapper):
         and the learner need not know about any of this behind-the-scenes.
         """
         if self.was_real_done:
-            obs = self.env.reset(**kwargs)
+            obs, info = self.env.reset(**kwargs)
         else:
             # no-op step to advance from terminal/lost life state
-            obs, _, _, _, _ = self.env.step(0)
+            obs, _, _, _, info = self.env.step(0)
         self.lives = self.env.unwrapped.ale.lives()
-        return obs
+        return obs, info
 
 class MaxAndSkipEnv(gym.Wrapper):
     def __init__(self, env, skip=4):
@@ -163,10 +163,10 @@ class FrameStack(gym.Wrapper):
         self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0], shp[1], shp[2] * k), dtype=np.uint8)
 
     def reset(self):
-        ob = self.env.reset()
+        ob, info = self.env.reset()
         for _ in range(self.k):
             self.frames.append(ob)
-        return self._get_ob()
+        return self._get_ob(), info
 
     def step(self, action):
         ob, reward, done, truncated, info = self.env.step(action)
