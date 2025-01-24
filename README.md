@@ -1,4 +1,5 @@
 # Rainbow DQN: Combining Improvements in Deep Reinforcement Learning
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
 ## Overview
 This repository provides a comprehensive summary of the paper [*"Rainbow: Combining Improvements in Deep Reinforcement Learning"*](https://arxiv.org/pdf/1710.02298) by Hessel et al., alongside a practical implementation of a Rainbow DQN agent. The implementation is tested on the CartPole environment, showcasing its efficiency in solving reinforcement learning problems.
