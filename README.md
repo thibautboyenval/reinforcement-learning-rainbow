@@ -6,7 +6,7 @@ This repository provides a comprehensive summary of the paper [*"Rainbow: Combin
 
 ## Contents
 1. **Paper Summary**
-   - A concise breakdown of the key components and contributions of the Rainbow DQN architecture. [[pdf]](https://github.com/thibautboyenval/reinforcement-learning-rainbow/blob/main/Rainbow.pdf)
+   - A concise breakdown of the key components and contributions of the Rainbow DQN architecture [[pdf]](https://github.com/thibautboyenval/reinforcement-learning-rainbow/blob/main/Rainbow.pdf).
 2. **Implementation**
    - A detailed notebook implementing the Rainbow DQN agent. It can be open and run directly in [[Colab]](https://colab.research.google.com/github/thibautboyenval/reinforcement-learning-rainbow/blob/main/rainbow.ipynb).
    - Hyperparameter configurations and explanations of the key improvements.
